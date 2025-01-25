@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Wasm Hello World</title>
+</head>
+<body>
+    <script type="module">
+        import init, { greet } from './pkg/wasm_websocket.js';
+
+        async function run() {
+            await init();
+            const result = greet("WebAssembly");
+            alert(result);
+        }
+
+        run();
+    </script>
+</body>
+</html>
+s

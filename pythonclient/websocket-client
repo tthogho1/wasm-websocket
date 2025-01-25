@@ -1,0 +1,66 @@
+import asyncio
+import websockets
+import argparse
+import time
+from datetime import datetime
+
+class WebSocketConnectionChecker:
+    def __init__(self, url, timeout=10, interval=5, count=3):
+        """
+        WebSocket接続確認ツール
+        
+        Args:
+            url (str): 接続先WebSocketサーバのURL
+            timeout (int): 接続タイムアウト時間(秒)
+            interval (int): 接続試行間隔(秒)
+            count (int): 接続試行回数
+        """
+        self.url = url
+        self.timeout = timeout
+        self.interval = interval
+        self.count = count
+
+    async def check_connection(self):
+        """WebSocket接続を確認し、結果を出力"""
+        print(f"WebSocket接続確認: {self.url}")
+        print(f"タイムアウト: {self.timeout}秒")
+        print(f"接続試行回数: {self.count}")
+        print(f"接続間隔: {self.interval}秒\n")
+
+        for attempt in range(1, self.count + 1):
+            try:
+                start_time = time.time()
+                async with websockets.connect(self.url, ping_timeout=self.timeout) as websocket:
+                    end_time = time.time()
+                    connection_time = end_time - start_time
+
+                    # 接続後にpingを送信
+                    await websocket.ping()
+                    
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+                          f"接続{attempt}回目: 成功 (接続時間: {connection_time:.2f}秒)")
+                
+            except websockets.exceptions.WebSocketException as e:
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+                      f"接続{attempt}回目: 失敗 - {e}")
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+                      f"予期せぬエラー: {e}")
+            
+            # 最後の試行でない場合は待機
+            if attempt < self.count:
+                await asyncio.sleep(self.interval)
+
+def main():
+    
+    checker = WebSocketConnectionChecker(
+        url="ws://localhost:8080/ws",  
+        timeout=10,
+        interval=5,
+        count=3
+    )
+    
+    asyncio.run(checker.check_connection())
+
+if __name__ == '__main__':
+    main()
