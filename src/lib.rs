@@ -2,9 +2,16 @@ use wasm_bindgen::prelude::*;
 use web_sys::{WebSocket, MessageEvent, ErrorEvent, console};
 //use wasm_bindgen_futures::JsFuture;
 
+mod webrtc_peer_connection;
+use webrtc_peer_connection::WebRTCConnection;
+
 #[wasm_bindgen]
-pub fn greet(name: &str) -> String {
-    format!("Hello, {}!", name)
+pub async fn greet(name: &str) -> String {
+    let connection = WebRTCConnection::new().unwrap();
+
+    let offer = connection.create_offer().await.unwrap();
+
+    format!("Hello1, {}! offer, {:?}!", name,offer)
 }
 
 #[wasm_bindgen]
