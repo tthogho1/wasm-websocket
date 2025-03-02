@@ -13,6 +13,7 @@
     <div id="messages"></div>
     <input type="text" id="messageInput" placeholder="Enter message">
     <button id="sendButton">Send</button>
+    <button id="startButton">Start</button>
 
     <script type="module">
         import init, { WebSocketClient, greet } from './pkg/wasm_websocket.js';
@@ -32,12 +33,12 @@
             });
 
             // Handle incoming messages
-            client.on_message((_, event) => {
-                log(`Received: ${event}`);
+            client.on_message((msg) => {
+                log(`Received: ${msg}`);
             });
 
             // Handle errors
-            client.on_error((_, error) => {
+            client.on_error((error) => {
                 log(`Error: ${error}`);
             });
 
@@ -48,6 +49,11 @@
                 client.send_message(message);
                 log(`Sent: ${message}`);
                 input.value = ''; // Clear input
+            });
+
+            document.getElementById('startButton').addEventListener('click', () => {
+                const result = greet('WebSocket');
+                console.log(result);
             });
 
             function log(message) {
