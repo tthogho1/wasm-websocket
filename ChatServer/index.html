@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; }
+        #input { width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Chat Client</h1>
+    <div id="messages"></div>
+    <input id="input" type="text" placeholder="Type a message..." />
+    <script>
+        const socket = new WebSocket('ws://localhost:3000');
+
+        socket.onopen = () => {
+            console.log('Connected to the server');
+        };
+
+        socket.onmessage = async (event) => {
+            let data;
+            if (event.data instanceof Blob) {
+                data = await event.data.text();
+            } else {
+                data = event.data;
+            }
+
+            const messagesDiv = document.getElementById('messages');
+            // Create a new div for the message
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = data; // Use textContent for security
+            messagesDiv.appendChild(messageDiv);  
+        };
+
+        const inputField = document.getElementById('input');
+        inputField.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                const message = inputField.value;
+                socket.send(message);
+                inputField.value = ''; // Clear input field
+            }
+        });
+    </script>
+</body>
+</html>
