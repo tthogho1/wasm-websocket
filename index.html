@@ -16,13 +16,10 @@
     <button id="startButton">Start</button>
 
     <script type="module">
-        import init, { WebSocketClient, greet } from './pkg/wasm_websocket.js';
+        import init, { WebSocketClient } from './pkg/wasm_websocket.js';
 
         async function run() {
             await init(); // Initialize Wasm module
-
-            // Greet example
-            console.log(greet('WebSocket'));
 
             // Create WebSocket client (replace with your WebSocket server URL)
             const client = new WebSocketClient('ws://localhost:3000');
@@ -51,8 +48,8 @@
                 input.value = ''; // Clear input
             });
 
-            document.getElementById('startButton').addEventListener('click', () => {
-                const result = greet('WebSocket');
+            document.getElementById('startButton').addEventListener('click', async () => {
+                const result = await client.offer();
                 console.log(result);
             });
 

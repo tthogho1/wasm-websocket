@@ -1,5 +1,6 @@
 import express from 'express';
 import { Server } from 'ws';
+import WebSocket from 'ws';
 
 const app = express();
 const port = 3000;
@@ -26,10 +27,11 @@ const decodeMessage = async (message :any):Promise<string> => {
         console.log("Received blob message"); 
         decodedString = await message.text();
     } else if (message instanceof Uint8Array){
-        console.log('Received Unit8Array');
+        console.log(`Received Unit8Array ${message}`);
         const decoder = new TextDecoder("utf-8");
 
         decodedString = decoder.decode(message);
+        console.log("Received Unit8Array message: " + decodedString);
     }else {
         console.log('Received unknown message type');
     }
@@ -50,7 +52,8 @@ wss.on('connection', (ws) => {
 
         const decodedString = await decodeMessage(message);
         wss.clients.forEach((client) => {
-            if (client.readyState === client.OPEN) {
+            // Send message to all clients except the sender
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(decodedString);
             }
         });

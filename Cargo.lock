@@ -153,6 +153,7 @@ name = "wasm-websocket"
 version = "0.1.0"
 dependencies = [
  "js-sys",
+ "once_cell",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

@@ -1,18 +1,10 @@
 use wasm_bindgen::prelude::*;
 use web_sys::{WebSocket, MessageEvent, ErrorEvent, console};
-//use wasm_bindgen_futures::JsFuture;
-
 mod webrtc_peer_connection;
 use webrtc_peer_connection::WebRTCConnection;
-
-#[wasm_bindgen]
-pub async fn greet(name: &str) -> String {
-    let connection = WebRTCConnection::new().unwrap();
-
-    let offer = connection.create_offer().await.unwrap();
-
-    format!("Hello1, {}! offer, {:?}!", name,offer)
-}
+use js_sys::JsString;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
 #[wasm_bindgen]
 pub struct WebSocketClient {
@@ -47,11 +39,14 @@ impl WebSocketClient {
     }
 
     pub fn send_message(&self, message: &str) -> Result<(), JsValue> {
+        console::log_1(&format!("Sending message to WebSocket: {:?}", message).into());
+
         self.ws.send_with_str(message)
     }
 
     pub fn on_open(&self, callback: js_sys::Function) -> Result<(), JsValue> {
         console::log_1(&"WebSocket on open.".into());
+
         let cloned_ws = self.ws.clone();
         let closure = Closure::wrap(Box::new(move |_event: JsValue| {
             let _ = callback.call0(&cloned_ws);
@@ -67,6 +62,9 @@ impl WebSocketClient {
         let cloned_ws = self.ws.clone();
         let closure = Closure::wrap(Box::new(move |event: MessageEvent| {
             let message = event.data();
+
+
+
             let _ = callback.call1(&cloned_ws, &message);
         }) as Box<dyn Fn(MessageEvent)>);
 
@@ -89,4 +87,17 @@ impl WebSocketClient {
     pub fn close(&self) -> Result<(), JsValue> {
         self.ws.close()
     }
+
+    pub async fn offer(&self) -> () {
+        let connection = WebRTCConnection::new().unwrap();
+        let offer = connection.create_offer().await.unwrap();
+        
+        let offer_str = js_sys::JSON::stringify(&offer).unwrap_or_else(|_| JsString::from(""));
+        if let Some(sdp_str) = offer_str.as_string() {
+            self.ws.send_with_str(&sdp_str).unwrap();
+        } else {
+            console::log_1(&JsValue::from_str("Failed to extract SDP"));
+        }
+    }
+
 }
