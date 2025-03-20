@@ -12,9 +12,8 @@ impl WebRTCConnection {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Result<WebRTCConnection, JsValue> {
         // RTCPeerConnection設定
-        //let config = Object::new();
         // Create an RtcConfiguration object
-        let mut config = RtcConfiguration::new();
+        let config = RtcConfiguration::new();
 
         Reflect::set(&config, &"iceServers".into(), 
             &js_sys::Array::of1(&get_ice_server()))?;
@@ -38,6 +37,11 @@ impl WebRTCConnection {
     // オファー生成
     pub async fn create_offer(&self) -> Result<JsValue, JsValue> {
         let promise = self.peer_connection.create_offer();
+        wasm_bindgen_futures::JsFuture::from(promise).await
+    }
+
+    pub async fn create_answer(&self) -> Result<JsValue, JsValue> {
+        let promise = self.peer_connection.create_answer();
         wasm_bindgen_futures::JsFuture::from(promise).await
     }
 
