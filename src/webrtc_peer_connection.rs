@@ -3,6 +3,7 @@ use web_sys::{RtcPeerConnection  ,RtcConfiguration,RtcPeerConnectionIceEvent, Rt
 use js_sys::{Object, Reflect};
 
 #[wasm_bindgen]
+#[derive(Clone)]    
 pub struct WebRTCConnection {
     peer_connection: RtcPeerConnection,
 }
