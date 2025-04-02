@@ -95,7 +95,10 @@ impl WebSocketClient {
                                         // console::log_1(&"Set offer to peerconnection.".into());
                 
                                         let answer = connection.create_answer().await.unwrap();
+                                        let rtc_answer: RtcSessionDescriptionInit = answer.clone().unchecked_into();
+                                        connection.set_local_description(&rtc_answer).await.unwrap();
                                         console::log_1(&format!("Created answer: {:?}", answer).into());
+
                                         let answer_str = js_sys::JSON::stringify(&answer).unwrap_or_else(|_| JsString::from(""));
                                         if let Some(sdp_str) = answer_str.as_string() {
                                             let ws = Arc::clone(&ws_clone);

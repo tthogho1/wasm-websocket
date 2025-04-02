@@ -31,6 +31,31 @@ impl WebRTCConnection {
         peer_connection.set_onicecandidate(Some(ice_candidate_closure.as_ref().unchecked_ref()));
         ice_candidate_closure.forget();
 
+
+        // ICE接続状態の変更を監視するイベントハンドラーを設定
+        let on_ice_connection_state_change = Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
+            let connection_state = Reflect::get(&event, &"target".into())
+                .and_then(|target| Reflect::get(&target, &"iceConnectionState".into()))
+                .unwrap_or_else(|_| JsValue::from("unknown"));
+    
+            web_sys::console::log_1(&format!("ICE connection state changed: {:?}", connection_state).into());
+        }) as Box<dyn FnMut(_)>);
+
+        peer_connection.set_oniceconnectionstatechange(Some(on_ice_connection_state_change.as_ref().unchecked_ref()));
+        on_ice_connection_state_change.forget(); // メモリリークを防ぐためにClosureを保持
+    
+        let peer_connection_clone = peer_connection.clone();
+        let on_signaling_state_change = Closure::wrap(Box::new(move || {
+            let signaling_state = Reflect::get(&peer_connection_clone, &JsValue::from_str("signalingState"))
+                .unwrap_or_else(|_| JsValue::from_str("unknown"));
+    
+            web_sys::console::log_1(&format!("Signaling state changed: {:?}", signaling_state).into());
+        }) as Box<dyn FnMut()>);
+    
+        peer_connection.set_onsignalingstatechange(Some(on_signaling_state_change.as_ref().unchecked_ref()));
+        on_signaling_state_change.forget(); // メモリリークを防ぐためにClosureを保持
+
+
         Ok(WebRTCConnection { peer_connection })
     }
 
