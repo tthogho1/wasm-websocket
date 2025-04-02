@@ -6,6 +6,7 @@ use webrtc_peer_connection::WebRTCConnection;
 use js_sys::JsString;
 use serde_json;
 use std::sync::Arc;
+use wasm_bindgen::JsCast;
 
 #[wasm_bindgen]
 pub struct WebSocketClient {
@@ -65,7 +66,7 @@ impl WebSocketClient {
     }
 
     pub fn on_message(&self, callback: js_sys::Function) -> Result<(), JsValue> {
-        console::log_1(&"WebSocket on message.".into());
+        // console::log_1(&"WebSocket on message.".into());
         let self_ws = Arc::new(self.ws.clone());
         let self_peer_connection = Arc::new(self.peerconnection.clone().unwrap());
 
@@ -73,32 +74,57 @@ impl WebSocketClient {
             let message = event.data();
             let ws_clone = Arc::clone(&self_ws);
             let peer_connection_clone = Arc::clone(&self_peer_connection);
-
-            console::log_1(&format!("Received message from WebSocket: {:?}", message.as_string()).into());
+ 
+            console::log_1(&format!("Received message : {:?}", message.as_string()).into());
             // judge if message is json or not
             if let Some(text) = message.as_string() {
                 match serde_json::from_str::<serde_json::Value>(&text) {
                     Ok(json) => {
-                        console::log_1(&format!("set Offer JSON : {:?}", json).into());
+                        // console::log_1(&format!("set Offer JSON : {:?}", json).into());
 
-                        spawn_local(async move {
-                            let offer = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-                            offer.set_sdp(json["sdp"].as_str().unwrap());
-                            let connection = Arc::clone(&peer_connection_clone);
-                            connection.set_remote_description(&offer).await.unwrap();
-                            console::log_1(&"Set offer to peerconnection.".into());
-    
-                            let answer = connection.create_answer().await.unwrap();
-                            console::log_1(&format!("Created answer: {:?}", answer).into());
-                            let answer_str = js_sys::JSON::stringify(&answer).unwrap_or_else(|_| JsString::from(""));
-                            if let Some(sdp_str) = answer_str.as_string() {
-                                let ws = Arc::clone(&ws_clone);
-                                ws.send_with_str(&sdp_str).unwrap();
-                            } else {
-                                console::log_1(&JsValue::from_str("Failed to extract SDP"));
+                        if  json["type"].is_string() {
+                            let sdp_type = json["type"].as_str().unwrap_or("");
+                            match sdp_type{
+                                "offer"=>{
+                                    // receive offer
+                                    spawn_local(async move {
+                                        let offer = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+                                        offer.set_sdp(json["sdp"].as_str().unwrap());
+                                        let connection = Arc::clone(&peer_connection_clone); 
+                                        connection.set_remote_description(&offer).await.unwrap();
+                                        // console::log_1(&"Set offer to peerconnection.".into());
+                
+                                        let answer = connection.create_answer().await.unwrap();
+                                        let rtc_answer: RtcSessionDescriptionInit = answer.clone().unchecked_into();
+                                        connection.set_local_description(&rtc_answer).await.unwrap();
+                                        console::log_1(&format!("Created answer: {:?}", answer).into());
+
+                                        let answer_str = js_sys::JSON::stringify(&answer).unwrap_or_else(|_| JsString::from(""));
+                                        if let Some(sdp_str) = answer_str.as_string() {
+                                            let ws = Arc::clone(&ws_clone);
+                                            //self.send_message(&sdp_str);
+                                            ws.send_with_str(&sdp_str).unwrap();
+                                            console::log_1(&format!("Send answer: {:?}", &sdp_str).into());
+                                        } else {
+                                            console::log_1(&JsValue::from_str("Failed to extract SDP"));
+                                        }
+                                    });
+                                }
+                                "answer" => {
+                                    spawn_local(async move {
+                                        let answer = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+                                        answer.set_sdp(json["sdp"].as_str().unwrap());
+
+                                        let connection = Arc::clone(&peer_connection_clone);
+                                        connection.set_remote_description(&answer).await.unwrap();
+                                        console::log_1(&"Set answer to peerconnection.".into());
+                                    });
+                                }
+                                _ => {
+                                    console::log_1(&JsValue::from_str("Unknown SDP type"));
+                                }
                             }
-                        });
-
+                        }
                     },
                     Err(_) => {
                         console::log_1(&format!("Received non-JSON message: {}", text).into());
@@ -132,10 +158,14 @@ impl WebSocketClient {
 
     pub async fn offer(&mut self) -> () {
         let offer = self.peerconnection.as_ref().unwrap().create_offer().await.unwrap();
-        
+        let rtc_offer: RtcSessionDescriptionInit = offer.clone().unchecked_into();
+
+        self.peerconnection.as_ref().unwrap().set_local_description(&rtc_offer).await.unwrap();
+
         let offer_str = js_sys::JSON::stringify(&offer).unwrap_or_else(|_| JsString::from(""));
         if let Some(sdp_str) = offer_str.as_string() {
-            self.ws.send_with_str(&sdp_str).unwrap();
+            self.send_message(&sdp_str);
+            //self.ws.send_with_str(&sdp_str).unwrap();
         } else {
             console::log_1(&JsValue::from_str("Failed to extract SDP"));
         }
