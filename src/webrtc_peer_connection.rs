@@ -14,13 +14,12 @@ impl WebRTCConnection {
     pub fn new() -> Result<WebRTCConnection, JsValue> {
         // RTCPeerConnection設定
         // Create an RtcConfiguration object
+        console_log(&format!("start webrtc connection"));
         let config = RtcConfiguration::new();
 
-        Reflect::set(&config, &"iceServers".into(), 
-            &js_sys::Array::of1(&get_ice_server()))?;
+        Reflect::set(&config, &"iceServers".into(), &js_sys::Array::of1(&get_ice_server()))?;
 
         let peer_connection = RtcPeerConnection::new_with_configuration(&config)?;
-        //let peer_connection = RtcPeerConnection::new()?;
         // ICEイベントリスナーの設定
         let ice_candidate_closure = Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
             if let Some(candidate) = event.candidate() {
