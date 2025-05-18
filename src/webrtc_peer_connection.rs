@@ -1,6 +1,9 @@
 use wasm_bindgen::prelude::*;
-use web_sys::{RtcPeerConnection  ,RtcConfiguration,RtcPeerConnectionIceEvent, RtcSessionDescriptionInit, RtcIceCandidateInit};
+use web_sys::{ RtcPeerConnection, RtcConfiguration, RtcPeerConnectionIceEvent, RtcSessionDescriptionInit, RtcIceCandidateInit, HtmlVideoElement, MediaStream, MediaStreamConstraints, Document, Window};
+use web_sys::window as web_sys_window;
+use web_sys::Window as WebSysWindow;
 use js_sys::{Object, Reflect};
+use wasm_bindgen_futures::JsFuture;
 
 #[wasm_bindgen]
 #[derive(Clone)]    
@@ -90,6 +93,45 @@ impl WebRTCConnection {
         wasm_bindgen_futures::JsFuture::from(promise).await?;
         Ok(())
     }
+
+}
+
+#[wasm_bindgen(start)]
+pub fn start() {
+    wasm_bindgen_futures::spawn_local(async {
+        if let Err(e) = start_camera().await {
+            web_sys::console::error_1(&e);
+        }
+    });
+}
+
+
+async fn start_camera() -> Result<(), JsValue> {
+    // videoタグを取得
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+    let video = document
+        .get_element_by_id("camera")
+        .unwrap()
+        .dyn_into::<HtmlVideoElement>()?;
+
+    // カメラの制約を設定
+    let mut constraints = MediaStreamConstraints::new();
+    constraints.video(&JsValue::TRUE);
+    constraints.audio(&JsValue::FALSE);
+
+    // getUserMediaを呼び出す
+    let media_devices = window.navigator().media_devices()?;
+    let media_promise = media_devices.get_user_media_with_constraints(&constraints)?;
+
+    // PromiseをFutureに変換してawait
+    let stream = JsFuture::from(media_promise).await?;
+
+    // MediaStreamに変換してvideoタグにセット
+    let media_stream = stream.dyn_into::<MediaStream>()?;
+    video.set_src_object(Some(&media_stream));
+
+    Ok(())
 }
 
 // ICEサーバー設定のヘルパー関数

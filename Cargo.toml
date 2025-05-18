@@ -20,7 +20,14 @@ web-sys = { version = "0.3.77", features = [
 "BinaryType", 
 "MessageEvent", 
 "ErrorEvent",
-"console"] }
+"console",
+"Window",
+"Document",
+"MediaStream",
+"MediaStreamConstraints",
+"HtmlVideoElement",
+"MediaDevices",
+"Navigator"] }
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3.48"
 serde_json = "1.0"
