@@ -1,9 +1,8 @@
 use wasm_bindgen::prelude::*;
 use web_sys::{ RtcPeerConnection, RtcConfiguration, RtcPeerConnectionIceEvent, RtcSessionDescriptionInit, RtcIceCandidateInit, HtmlVideoElement, MediaStream, MediaStreamConstraints, Document, Window};
-use web_sys::window as web_sys_window;
-use web_sys::Window as WebSysWindow;
-use js_sys::{Object, Reflect};
+use js_sys::{Object, Reflect,Array};
 use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen::JsValue;
 
 #[wasm_bindgen]
 #[derive(Clone)]    
@@ -39,8 +38,8 @@ impl WebRTCConnection {
         let on_ice_connection_state_change = Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
             let connection_state = Reflect::get(&event, &"target".into())
                 .and_then(|target| Reflect::get(&target, &"iceConnectionState".into()))
-                .unwrap_or_else(|_| JsValue::from("unknown"));
-    
+                .unwrap_or(JsValue::from("unknown"));
+            
             web_sys::console::log_1(&format!("ICE connection state changed: {:?}", connection_state).into());
         }) as Box<dyn FnMut(_)>);
 
@@ -94,19 +93,33 @@ impl WebRTCConnection {
         Ok(())
     }
 
-}
 
-#[wasm_bindgen(start)]
-pub fn start() {
-    wasm_bindgen_futures::spawn_local(async {
-        if let Err(e) = start_camera().await {
-            web_sys::console::error_1(&e);
+    pub fn add_media_stream(&self, stream: &MediaStream) -> Result<(), JsValue> {
+        let tracks = stream.get_tracks();
+        for i in 0..tracks.length() {
+            let track = tracks.get(i).unchecked_into();
+            // ストリームの配列を作成
+            let streams = js_sys::Array::new();
+            streams.push(stream);
+
+            // add_trackに正しくストリームを渡す
+            self.peer_connection.add_track(&track, &streams)?;
         }
-    });
+        Ok(())
+    }
 }
 
+// #[wasm_bindgen(start)]
+// pub fn start() {
+//     wasm_bindgen_futures::spawn_local(async {
+//         if let Err(e) = start_camera().await {
+//             web_sys::console::error_1(&e);
+//         }
+//     });
+// }
 
-async fn start_camera() -> Result<(), JsValue> {
+
+pub async fn start_camera(peer : WebRTCConnection) -> Result<(), JsValue> {
     // videoタグを取得
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
@@ -130,6 +143,8 @@ async fn start_camera() -> Result<(), JsValue> {
     // MediaStreamに変換してvideoタグにセット
     let media_stream = stream.dyn_into::<MediaStream>()?;
     video.set_src_object(Some(&media_stream));
+
+    peer.add_media_stream(&media_stream)?;
 
     Ok(())
 }
