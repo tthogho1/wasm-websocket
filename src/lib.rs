@@ -7,6 +7,7 @@ use js_sys::JsString;
 use serde_json;
 use std::sync::Arc;
 use wasm_bindgen::JsCast;
+use crate::webrtc_peer_connection::start_camera;
 
 #[wasm_bindgen]
 pub struct WebSocketClient {
@@ -25,6 +26,13 @@ impl WebSocketClient {
         // craete webrtc peerconnection
         let peer = Some(WebRTCConnection::new().unwrap());
         console::log_1(&"WebRtc connection create.".into());
+
+        spawn_local(async {
+            if let Err(e) = start_camera(peer).await {
+                web_sys::console::error_1(&e);
+            }
+        });
+
         // create websocket
         let ws = match WebSocket::new(url) {
             Ok(socket) => { 
