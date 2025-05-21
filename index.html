@@ -6,7 +6,7 @@
     <style>
       body {
         font-family: Arial, sans-serif;
-        max-width: 600px;
+        max-width: 800px;
         margin: 0 auto;
         padding: 20px;
       }
@@ -17,26 +17,90 @@
         padding: 10px;
         margin-bottom: 10px;
       }
-      #webcam {
+      .video-container {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      .video-box {
+        width: 48%;
+      }
+      #camera, #remoteVideo {
         border: 1px solid #333;
         width: 100%;
         height: auto;
+        background-color: #f0f0f0;
+        min-height: 240px;
+      }
+      h2 {
+        font-size: 1.2em;
+        margin-bottom: 10px;
+      }
+      .message-input {
+        display: flex;
+        margin-top: 10px;
+      }
+      #messageInput {
+        flex-grow: 1;
+        padding: 8px;
+        margin-right: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .controls {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+      }
+      .status {
+        color: #666;
+        font-style: italic;
         margin-bottom: 10px;
       }
     </style>
   </head>
   <body>
-    <h1>WebSocket Wasm Client</h1>
+    <h1>WebRTC Video Chat</h1>
+    
+    <div class="status" id="connectionStatus">Status: Not connected</div>
 
-    <h2>Webcam Stream</h2>
-    <!-- video id="webcam" autoplay></video -->
-    <video id="camera" autoplay muted playsinline></video>
+    <div class="video-container">
+      <div class="video-box">
+        <h2>Local Video</h2>
+        <video id="camera" autoplay muted playsinline></video>
+      </div>
+      <div class="video-box">
+        <h2>Remote Video</h2>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="startButton">Start Connection</button>
+      <button id="webcamButton">Start Webcam</button>
+    </div>
 
     <div id="messages"></div>
-    <input type="text" id="messageInput" placeholder="Enter message" />
-    <button id="sendButton">Send</button>
-    <button id="startButton">Start</button>
-    <button id="webcamButton">Start Webcam</button>
+    <div class="message-input">
+      <input type="text" id="messageInput" placeholder="Enter message" />
+      <button id="sendButton">Send</button>
+    </div>
 
     <script type="module">
       import init, { WebSocketClient } from './pkg/wasm_websocket.js';
@@ -50,6 +114,7 @@
         // Handle connection open
         client.on_open(() => {
           log('Connection opened');
+          document.getElementById('connectionStatus').textContent = 'Status: Connected to signaling server';
         });
 
         // Handle incoming messages
@@ -60,6 +125,7 @@
         // Handle errors
         client.on_error(error => {
           log(`Error: ${error}`);
+          document.getElementById('connectionStatus').textContent = 'Status: Connection error';
         });
 
         // Send message button
@@ -72,22 +138,34 @@
         });
 
         document.getElementById('startButton').addEventListener('click', async () => {
+          log('Starting WebRTC connection...');
+          document.getElementById('connectionStatus').textContent = 'Status: Initiating WebRTC connection...';
           const result = await client.offer();
-          console.log(result);
+          log('Connection offer sent');
+          document.getElementById('connectionStatus').textContent = 'Status: WebRTC offer sent, waiting for answer...';
         });
 
         // Start webcam button
-        /// document.getElementById('webcamButton').addEventListener('click', async () => {
-        //    try {
-        //        const video = document.getElementById('webcam');
-        //        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        //        video.srcObject = stream;
-        //        log('Webcam started');
-        //     } catch (error) {
-        //        log(`Error accessing the webcam: ${error.message}`);
-        //        console.error('Error accessing the webcam:', error);
-        //    }
-        // });
+        document.getElementById('webcamButton').addEventListener('click', async () => {
+           try {
+               const video = document.getElementById('camera');
+               document.getElementById('connectionStatus').textContent = 'Status: Accessing camera...';
+               const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+               video.srcObject = stream;
+               log('Webcam started');
+               document.getElementById('connectionStatus').textContent = 'Status: Camera access successful';
+               
+               // Add the stream to the peer connection
+               if (client) {
+                 // The stream will be added to the peer connection in the Rust code
+                 log('Stream ready for WebRTC connection');
+               }
+            } catch (error) {
+               log(`Error accessing the webcam: ${error.message}`);
+               console.error('Error accessing the webcam:', error);
+               document.getElementById('connectionStatus').textContent = 'Status: Camera access failed';
+           }
+        });
 
         function log(message) {
           const messagesDiv = document.getElementById('messages');

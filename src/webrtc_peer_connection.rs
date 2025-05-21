@@ -1,8 +1,10 @@
 use wasm_bindgen::prelude::*;
-use web_sys::{ RtcPeerConnection, RtcConfiguration, RtcPeerConnectionIceEvent, RtcSessionDescriptionInit, RtcIceCandidateInit, HtmlVideoElement, MediaStream, MediaStreamConstraints, Document, Window};
+use web_sys::{ RtcPeerConnection, RtcConfiguration, RtcPeerConnectionIceEvent, RtcSessionDescriptionInit, RtcIceCandidateInit, HtmlVideoElement, MediaStream, MediaStreamConstraints, Document, Window, RtcTrackEvent};
 use js_sys::{Object, Reflect,Array};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen::JsValue;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[wasm_bindgen]
 #[derive(Clone)]    
@@ -57,6 +59,36 @@ impl WebRTCConnection {
         peer_connection.set_onsignalingstatechange(Some(on_signaling_state_change.as_ref().unchecked_ref()));
         on_signaling_state_change.forget(); // メモリリークを防ぐためにClosureを保持
 
+        // Add ontrack event handler to handle incoming media tracks
+        let on_track = Closure::wrap(Box::new(move |event: RtcTrackEvent| {
+            web_sys::console::log_1(&"Received remote track".into());
+            
+            if let Some(streams) = event.streams() {
+                if streams.length() > 0 {
+                    let remote_stream = streams.get(0);
+                    
+                    // Get the remote video element and set the stream as its source
+                    if let Some(window) = web_sys::window() {
+                        if let Some(document) = window.document() {
+                            if let Some(video_element) = document.get_element_by_id("remoteVideo") {
+                                if let Ok(video) = video_element.dyn_into::<HtmlVideoElement>() {
+                                    video.set_src_object(Some(&remote_stream));
+                                    web_sys::console::log_1(&"Remote video stream connected".into());
+                                    
+                                    // Update connection status
+                                    if let Some(status_element) = document.get_element_by_id("connectionStatus") {
+                                        let _ = status_element.set_text_content(Some("Status: Remote video connected"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(RtcTrackEvent)>);
+
+        peer_connection.set_ontrack(Some(on_track.as_ref().unchecked_ref()));
+        on_track.forget();
 
         Ok(WebRTCConnection { peer_connection })
     }
@@ -119,7 +151,7 @@ impl WebRTCConnection {
 // }
 
 
-pub async fn start_camera(peer : WebRTCConnection) -> Result<(), JsValue> {
+pub async fn start_camera(peer: WebRTCConnection) -> Result<(), JsValue> {
     // videoタグを取得
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
