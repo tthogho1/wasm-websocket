@@ -11,7 +11,7 @@ use crate::webrtc_peer_connection::start_camera;
 
 #[wasm_bindgen]
 pub struct WebSocketClient {
-    peerconnection: Option<WebRTCConnection>,
+    peerconnection: WebRTCConnection,
     ws: WebSocket,
 }
 
@@ -24,11 +24,12 @@ impl WebSocketClient {
         console::log_1(&formatted_log.into());
 
         // craete webrtc peerconnection
-        let peer = Some(WebRTCConnection::new().unwrap());
+        let peer = WebRTCConnection::new().unwrap();
         console::log_1(&"WebRtc connection create.".into());
 
-        spawn_local(async {
-            if let Err(e) = start_camera(peer).await {
+        let peer_clone = peer.clone();
+        spawn_local(async move {
+            if let Err(e) = start_camera(peer_clone).await {
                 web_sys::console::error_1(&e);
             }
         });
@@ -76,7 +77,7 @@ impl WebSocketClient {
     pub fn on_message(&self, callback: js_sys::Function) -> Result<(), JsValue> {
         // console::log_1(&"WebSocket on message.".into());
         let self_ws = Arc::new(self.ws.clone());
-        let self_peer_connection = Arc::new(self.peerconnection.clone().unwrap());
+        let self_peer_connection = Arc::new(self.peerconnection.clone());
 
         let closure = Closure::wrap(Box::new( move |event: MessageEvent| {
             let message = event.data();
@@ -107,6 +108,15 @@ impl WebSocketClient {
                                         connection.set_local_description(&rtc_answer).await.unwrap();
                                         console::log_1(&format!("Created answer: {:?}", answer).into());
 
+                                        // Update connection status
+                                        if let Some(window) = web_sys::window() {
+                                            if let Some(document) = window.document() {
+                                                if let Some(status_element) = document.get_element_by_id("connectionStatus") {
+                                                    let _ = status_element.set_text_content(Some("Status: Received offer, sent answer"));
+                                                }
+                                            }
+                                        }
+
                                         let answer_str = js_sys::JSON::stringify(&answer).unwrap_or_else(|_| JsString::from(""));
                                         if let Some(sdp_str) = answer_str.as_string() {
                                             let ws = Arc::clone(&ws_clone);
@@ -126,6 +136,15 @@ impl WebSocketClient {
                                         let connection = Arc::clone(&peer_connection_clone);
                                         connection.set_remote_description(&answer).await.unwrap();
                                         console::log_1(&"Set answer to peerconnection.".into());
+                                        
+                                        // Update connection status
+                                        if let Some(window) = web_sys::window() {
+                                            if let Some(document) = window.document() {
+                                                if let Some(status_element) = document.get_element_by_id("connectionStatus") {
+                                                    let _ = status_element.set_text_content(Some("Status: Received answer, connection established"));
+                                                }
+                                            }
+                                        }
                                     });
                                 }
                                 _ => {
@@ -165,10 +184,10 @@ impl WebSocketClient {
     }
 
     pub async fn offer(&mut self) -> () {
-        let offer = self.peerconnection.as_ref().unwrap().create_offer().await.unwrap();
+        let offer = self.peerconnection.create_offer().await.unwrap();
         let rtc_offer: RtcSessionDescriptionInit = offer.clone().unchecked_into();
 
-        self.peerconnection.as_ref().unwrap().set_local_description(&rtc_offer).await.unwrap();
+        self.peerconnection.set_local_description(&rtc_offer).await.unwrap();
 
         let offer_str = js_sys::JSON::stringify(&offer).unwrap_or_else(|_| JsString::from(""));
         if let Some(sdp_str) = offer_str.as_string() {
