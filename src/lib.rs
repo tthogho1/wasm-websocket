@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{WebSocket, MessageEvent, ErrorEvent,console, RtcSessionDescriptionInit,RtcSdpType };
+use web_sys::{WebSocket, MessageEvent, ErrorEvent, console, RtcSessionDescriptionInit, RtcSdpType, RtcIceCandidateInit};
+use wasm_bindgen::JsValue;
 mod webrtc_peer_connection;
 use webrtc_peer_connection::WebRTCConnection;
 use js_sys::JsString;
@@ -24,15 +25,6 @@ impl WebSocketClient {
         console::log_1(&formatted_log.into());
 
         // craete webrtc peerconnection
-        let peer = WebRTCConnection::new().unwrap();
-        console::log_1(&"WebRtc connection create.".into());
-
-        let peer_clone = peer.clone();
-        spawn_local(async move {
-            if let Err(e) = start_camera(peer_clone).await {
-                web_sys::console::error_1(&e);
-            }
-        });
 
         // create websocket
         let ws = match WebSocket::new(url) {
@@ -50,6 +42,16 @@ impl WebSocketClient {
         // Set binary type to arraybuffer
         ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
         console::log_1(&"WebSocket set binary type.".into());
+
+        let peer = WebRTCConnection::new(ws.clone()).unwrap();
+        console::log_1(&"WebRtc connection create.".into());
+
+        let peer_clone = peer.clone();
+        spawn_local(async move {
+            if let Err(e) = start_camera(peer_clone).await {
+                web_sys::console::error_1(&e);
+            }
+        });
 
         // 
         Ok(WebSocketClient {peerconnection: peer, ws })
@@ -89,12 +91,10 @@ impl WebSocketClient {
             if let Some(text) = message.as_string() {
                 match serde_json::from_str::<serde_json::Value>(&text) {
                     Ok(json) => {
-                        // console::log_1(&format!("set Offer JSON : {:?}", json).into());
-
-                        if  json["type"].is_string() {
+                        if json["type"].is_string() {
                             let sdp_type = json["type"].as_str().unwrap_or("");
-                            match sdp_type{
-                                "offer"=>{
+                            match sdp_type {
+                                "offer" => {
                                     // receive offer
                                     spawn_local(async move {
                                         let offer = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
@@ -147,6 +147,28 @@ impl WebSocketClient {
                                         }
                                     });
                                 }
+                                "icecandidate" => {
+                                    // ICE Candidate受信時の処理
+                                    if let Some(candidate_val) = json.get("candidate") {
+                                        // candidate_valはserde_json::Valueなので、candidate文字列を直接取得
+                                        let candidate_str = candidate_val["candidate"].as_str().unwrap_or("");
+                                        let mut candidate_obj = RtcIceCandidateInit::new(candidate_str);
+                                        if let Some(sdp_mid) = candidate_val["sdpMid"].as_str() {
+                                            candidate_obj.set_sdp_mid(Some(sdp_mid));
+                                        }
+                                        if let Some(sdp_mline_index) = candidate_val["sdpMLineIndex"].as_u64() {
+                                            candidate_obj.set_sdp_m_line_index(Some(sdp_mline_index as u16));
+                                        }
+                                        let connection = Arc::clone(&peer_connection_clone);
+                                        wasm_bindgen_futures::spawn_local(async move {
+                                            if let Err(e) = connection.add_ice_candidate(&candidate_obj).await {
+                                                web_sys::console::error_1(&e);
+                                            } else {
+                                                web_sys::console::log_1(&"ICE candidate added".into());
+                                            }
+                                        });
+                                    }
+                                },
                                 _ => {
                                     console::log_1(&JsValue::from_str("Unknown SDP type"));
                                 }
